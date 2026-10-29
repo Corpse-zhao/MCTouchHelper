@@ -29,7 +29,7 @@ jobs:
       - name: Build package
         run: |
           cd "$GITHUB_WORKSPACE"
-          gmake package THEOS_PACKAGE_SCHEME=roothide FINALPACKAGE=1
+          make package THEOS_PACKAGE_SCHEME=roothide FINALPACKAGE=1
 
       - name: Verify deb structure
         run: |
