@@ -41,15 +41,19 @@ jobs:
           DEB=$(ls packages/*.deb | head -1)
           echo "== deb: $DEB =="
           ar t "$DEB"
-          mkdir -p /tmp/debcheck && cd /tmp/debcheck
+          rm -rf /tmp/debcheck && mkdir -p /tmp/debcheck && cd /tmp/debcheck
           ar x "$GITHUB_WORKSPACE/$DEB"
+          ls -la
           echo "== control =="
-          cat control
-          grep -q "Architecture: iphoneos-arm64e" control && echo "ARCH OK" || (echo "ARCH FAIL" && exit 1)
+          CTRL=$(ls control.tar.* | head -1)
+          tar -xOf "$CTRL" ./control
+          tar -xOf "$CTRL" ./control | grep -q "Architecture: iphoneos-arm64e" && echo "ARCH OK" || (echo "ARCH FAIL" && exit 1)
           echo "== data files =="
-          tar -tf data.tar.xz 2>/dev/null || tar -tf data.tar.zst
+          DATA=$(ls data.tar.* | head -1)
+          mkdir -p /tmp/debdata && tar -xf "$DATA" -C /tmp/debdata
+          find /tmp/debdata -type f
           echo "== dylib slices =="
-          D=$(find . -name "MCTouchHelper.dylib" | head -1)
+          D=$(find /tmp/debdata -name "MCTouchHelper.dylib" | head -1)
           if [ -n "$D" ]; then
             lipo -info "$D"
             lipo -info "$D" | grep -q arm64e && echo "SLICES OK" || (echo "SLICES FAIL" && exit 1)
