@@ -1,0 +1,61 @@
+name: Build MCTouchHelper
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Theos (roothide)
+        run: |
+          git clone --recursive https://github.com/roothide/theos.git $HOME/theos
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+
+      - name: Install iOS SDK
+        run: |
+          cd $HOME/theos/sdks
+          curl -L -o sdks.zip https://github.com/theos/sdks/archive/refs/heads/master.zip
+          unzip -q sdks.zip
+          mv sdks-master/iPhoneOS14.5.sdk .
+          rm -rf sdks-master sdks.zip
+          ls $HOME/theos/sdks
+
+      - name: Build package
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          gmake package THEOS_PACKAGE_SCHEME=roothide FINALPACKAGE=1
+
+      - name: Verify deb structure
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          ls -la packages/
+          DEB=$(ls packages/*.deb | head -1)
+          echo "== deb: $DEB =="
+          ar t "$DEB"
+          mkdir -p /tmp/debcheck && cd /tmp/debcheck
+          ar x "$GITHUB_WORKSPACE/$DEB"
+          echo "== control =="
+          cat control
+          grep -q "Architecture: iphoneos-arm64e" control && echo "ARCH OK" || (echo "ARCH FAIL" && exit 1)
+          echo "== data files =="
+          tar -tf data.tar.xz 2>/dev/null || tar -tf data.tar.zst
+          echo "== dylib slices =="
+          D=$(find . -name "MCTouchHelper.dylib" | head -1)
+          if [ -n "$D" ]; then
+            lipo -info "$D"
+            lipo -info "$D" | grep -q arm64e && echo "SLICES OK" || (echo "SLICES FAIL" && exit 1)
+          else
+            echo "DYLIB NOT FOUND" && exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MCTouchHelper-deb
+          path: packages/*.deb
