@@ -1,6 +1,6 @@
 Package: com.corpsezhao.mctouchhelper
 Name: MCTouchHelper
-Version: 0.1.0
+Version: 0.1.1
 Architecture: iphoneos-arm64e
 Description: MotoCarPlay 浮窗手势桥：监听 App 的通知，在 SpringBoard 内模拟一次状态栏右侧左滑（交给 SquidGesture 执行浮窗打开）
 Maintainer: Corpse-zhao

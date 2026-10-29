@@ -93,7 +93,12 @@ static void MCInjectSwipe(float fx0, float fy0, float fx1, float fy1) {
     schedule(client, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
 
     CGSize s = mcScreen;
-    if (s.width < 1.0) s = [UIScreen mainScreen].bounds.size;
+    if (s.width < 1.0) {
+        // 此时主队列已在正常运行（不在 dyld 初始化阶段），同步取一次是安全的
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            s = [UIScreen mainScreen].bounds.size;
+        });
+    }
     float x0 = fx0 * s.width,  y0 = fy0 * s.height;
     float x1 = fx1 * s.width,  y1 = fy1 * s.height;
     NSLog(@"[MCTouchHelper] swipe (%.1f,%.1f) -> (%.1f,%.1f) screen %.0fx%.0f", x0, y0, x1, y1, s.width, s.height);
@@ -159,14 +164,12 @@ static void MCCallback(CFNotificationCenterRef center, void *observer,
 %ctor {
     @autoreleasepool {
         mcQueue = dispatch_queue_create("com.corpsezhao.mctouchhelper.inject", DISPATCH_QUEUE_SERIAL);
-        // 在主线程取一次屏幕尺寸
-        dispatch_sync(dispatch_get_main_queue(), ^{
-            mcScreen = [UIScreen mainScreen].bounds.size;
-        });
+        // 注意：%ctor 运行在 dyld 加载库阶段，主队列尚未开始运行，
+        // 这里绝不能 dispatch_sync 到主队列（会死锁导致 SpringBoard 黑屏转圈）。
+        // 屏幕尺寸延迟到注入时再取（见 MCInjectSwipe）。
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
                                         NULL, MCCallback, kMCNotifyName,
                                         NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
-        NSLog(@"[MCTouchHelper] loaded, screen %.0fx%.0f, listening for %@",
-              mcScreen.width, mcScreen.height, kMCNotifyName);
+        NSLog(@"[MCTouchHelper] loaded, listening for %@", kMCNotifyName);
     }
 }
